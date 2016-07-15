@@ -1,6 +1,6 @@
 The Interpol.jl package is licensed under the MIT "Expat" License:
 
-> Copyright (c) 2016: JKrehl.
+> Copyright (c) 2016: Jonas Krehl <Jonas.Krehl@triebenberg.de>
 >
 > Permission is hereby granted, free of charge, to any person obtaining
 > a copy of this software and associated documentation files (the
