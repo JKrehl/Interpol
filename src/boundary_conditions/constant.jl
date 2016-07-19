@@ -1,23 +1,20 @@
 export ConstantBoundary
 
-type ConstantBoundary{T} <: AbstractBoundaryCondition
-	val::T
+type ConstantBoundary{V} <: AbstractBoundaryCondition
 end
+ConstantBoundary(V) = ConstantBoundary{V}()
+ConstantBoundary() = ConstantBoundary{0.}()
 
-ConstantBoundary() = ConstantBoundary{Float64}(0.)
-BCArray{T, N, T2}(arr::AbstractArray{T,N}, CB::ConstantBoundary{T2}) = BCArray{T, N, typeof(arr), ConstantBoundary{T}}(arr, ConstantBoundary{T}(T(CB.val)))
+function generate_boundarycondition{T, N, A, V}(bcarr::Type{BCArray{T, N, A, ConstantBoundary{V}}})
+	quote
+		arr = bcarr.arr
+		$(Expr(:block, [:($(symbol("x_", i)) = x[$i]) for i in 1:N]...))
 
-# to change to vararg{Int, N} when .5 becomes available
-@generated function getindex{T, N, A}(bcarr::BCArray{T, N, A, ConstantBoundary{T}}, x::Integer...)
-	macroexpand(quote
-		$(Expr(:meta, :inline))
-		$(Expr(:boundscheck, false))
-		if $(Expr(:||, [:((x[$i]<1) || (x[$i]>size(bcarr, $i))) for i in 1:N]...))
-			return res = bcarr.bc.val
+		if !$(reduce((i,j) -> Expr(:||, i, j), vcat([[:(1 > $(symbol("x_", i))), :($(symbol("x_", i)) > size(arr, $i))] for i in 1:N]...)))
+			#return getindex(arr, x...)
+			res = $(Expr(:call, :getindex, :arr, [symbol("x_", i) for i in 1:N]...))
 		else
-			res = getindex(bcarr.arr, x...)
+			res = $(T(V))
 		end
-		$(Expr(:boundscheck, :pop))
-		return res
-	end)
+	end
 end
