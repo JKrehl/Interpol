@@ -1,7 +1,7 @@
 export
 	BCArray
 
-import Base: size, getindex, linearindexing
+import Base: size, getindex, linearindexing, setindex!
 
 abstract AbstractBoundaryCondition
 
@@ -35,5 +35,14 @@ linearindexing(bcarr::BCArray) = Base.LinearSlow()
 		$(Expr(:meta, :inline))
 		@inbounds $(generate_boundarycondition(bcarr))
 		return res
+	end
+end
+
+function setindex!{T, T2, N, A, BC}(bcarr::BCArray{T, N, A, BC}, val::T2, x::Integer...)
+	if checkbounds(Bool, bcarr.arr, x...)
+		@inbounds setindex!(bcarr.arr, val, x...)
+		return true
+	else
+		return false
 	end
 end

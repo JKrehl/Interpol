@@ -29,7 +29,7 @@ linearindexing(bcarr::InterpArray) = Base.LinearSlow()
 
 	setup, coeffs, indices = Expr(:block), [], []
 	for (i,intp) in enumerate(interpols)
-		setup, coeffs, indices = generate_base_interpolation(typeof(iarr), i, intp, :x, setup, coeffs, indices)
+		setup, coeffs, indices = generate_base_interpolation(iarr, i, intp, :x, setup, coeffs, indices)
 	end
 
 	quote
@@ -45,12 +45,12 @@ end
 
 	setup, coeffs, indices = Expr(:block), [], []
 	for (i,intp) in enumerate(interpols)
-		setup, coeffs, indices = Interpol.generate_base_interpolation(iarr, i, intp, :x, setup, coeffs, indices)
+		setup, coeffs, indices = generate_base_interpolation(iarr, i, intp, :x, setup, coeffs, indices)
 	end
 
 	quote
 		$(Expr(:meta, :inline))
 		$(setup)
-		return $(Expr(:vect, coeffs...)), $(Expr(:vcat, [Expr(:row, indi...) for indi in indices]...))
+		return $(Expr(:typed_vcat, T, coeffs...)), $(Expr(:typed_vcat, Int64, [Expr(:row, indi...) for indi in indices]...))
 	end
 end
