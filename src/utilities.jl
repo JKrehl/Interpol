@@ -20,6 +20,7 @@ end
 
 @generated function checkbounds{T, N}(::Type{Bool}, arr::AbstractArray{T, N}, x::Integer...)
 	quote
+		$(Expr(:meta, :inline))
 		$(Expr(:block, [:($(symbol("x_", i)) = x[$i]) for i in 1:N]...))
 		return !$(reduce((i,j) -> Expr(:||, i, j), vcat([[:(1 > x[$i]), :(x[$i] > size(arr, $i))] for i in 1:N]...)))
 	end
