@@ -1,4 +1,6 @@
-export InterpolatedArray
+export
+	InterpolatedArray,
+	inplaceadd
 
 import Base: size, linearindexing, getindex
 
@@ -19,8 +21,20 @@ InterpolatedArray{A<:AbstractArray, IN<:AbstractInterpolation}(arr::A, interp::I
 		$(Expr(:boundscheck, :false))
 		$(Expr(:block, Expr(:(=), :arr, :(iarr.arr)), [Expr(:(=), symbol("x_", i), Expr(:ref, :x, i)) for i in 1:N]...))
 		$(setup)
-		re= $(Expr(:call, :+, [:($co*$(Expr(:ref, :(arr), id...))) for (co, id) in zip(coeffs, indices)]...))
+		res = $(Expr(:call, :+, [:($co*$(Expr(:ref, :(arr), id...))) for (co, id) in zip(coeffs, indices)]...))
 		$(Expr(:boundscheck, :pop))
-		return re
+		return res
+	end
+end
+
+@generated function inplaceadd{T, N, A, IN, V}(iarr::InterpolatedArray{T, N, A, IN}, val::V, x::Real...)
+	setup, coeffs, indices = generate_interpolation(IN, :x)
+	quote
+		$(Expr(:meta, :inline))
+		$(Expr(:boundscheck, :false))
+		$(Expr(:block, Expr(:(=), :arr, :(iarr.arr)), [Expr(:(=), symbol("x_", i), Expr(:ref, :x, i)) for i in 1:N]...))
+		$(setup)
+		$(Expr(:block, [Expr(:(+=), Expr(:ref, :(arr), id...), :($co*val)) for (co, id) in zip(coeffs, indices)]...))
+		$(Expr(:boundscheck, :pop))
 	end
 end
