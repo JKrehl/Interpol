@@ -8,7 +8,7 @@ immutable InterpolatedArray{T, N, A<:AbstractArray, IN<:AbstractInterpolation} <
 	arr::A
 	interp::IN
 end
-InterpolatedArray{A<:AbstractArray, IN<:AbstractInterpolation}(arr::A, interp::IN) = ndims(A)==ndims(I) ? InterpolatedArray{eltype(A), ndims(A), A, IN}(arr, interp) : throw(AssertionError("interpolation and array need to have the same number of dimensions"))
+InterpolatedArray{A<:AbstractArray, IN<:AbstractInterpolation}(arr::A, interp::IN) = ndims(A)==ndims(IN) ? InterpolatedArray{eltype(A), ndims(A), A, IN}(arr, interp) : throw(AssertionError("interpolation and array need to have the same number of dimensions"))
 
 @inline size(iarr::InterpolatedArray) = size(iarr.arr)
 @inline size(iarr::InterpolatedArray, i::Integer) = size(iarr.arr, i)

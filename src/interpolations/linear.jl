@@ -1,15 +1,14 @@
 export LinearInterpolation
 
-immutable LinearInterpolation <: AbstractInterpolation{1}
-end
+abstract LinearInterpolation <: AbstractInterpolation{1}
+LinearInterpolation() = LinearInterpolation
+ndims(::Type{
 
 function generate_base_interpolation(interp::Type{LinearInterpolation}, x::Symbol)
-	ix = symbol("i_", x)
-	rx = symbol("r_", x)
-	ax = symbol("a_", x)
+	ix = Symbol("i_", x)
 
-	setup = Expr(:block, :($ix = floor(Int64, $x)), :($rx = $x - $ix), :($ax = 1 - $rx))
-	coeffs = (ax, rx)
+	setup = :($ix = floor(Int64, $x))
+	coeffs = (:($ix+1-$x), :($x-$ix))
 	indices = (ix, :($ix+1))
 
 	return setup, coeffs, indices

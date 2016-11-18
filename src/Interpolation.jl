@@ -5,12 +5,11 @@ export
 import Base: ndims, getindex
 
 abstract AbstractInterpolation{N}
-ndims{N}(::AbstractInterpolation{N}) = N
-ndims{T<:AbstractInterpolation}(::Type{T}) = ndims(T())
+ndims{N}(::Type{AbstractInterpolation{N}}) = N
+ndims{T<:AbstractInterpolation}(::Type{T}) = ndims(T.super)
 
-immutable InterpolationContainer{N, INS<:Tuple{Vararg{AbstractInterpolation}}} <: AbstractInterpolation{N}
-end
-InterpolationContainer{INS}(::INS) = InterpolationContainer{sum(map(ndims, INS.parameters)), INS}()
+abstract InterpolationContainer{N, INS<:Tuple{Vararg{AbstractInterpolation}}} <: AbstractInterpolation{N}
+InterpolationContainer(INS) = InterpolationContainer{sum(map(ndims, INS)), Tuple(INS)}()
 
 function generate_interpolation(interp::AbstractInterpolation, x::Symbol)
 	return generate_base_interpolation(typeof(interp), symbol(x, "_1"))
@@ -44,8 +43,8 @@ function generate_interpolation{N, IN}(interps::InterpolationContainer{N, IN}, x
 
 	setup = Expr(:block, setup_bases...)
 
-	coeffs = eval(Expr(:comprehension, :(Expr(:call, :*, $(vars...))), [Expr(:(=), var, bc) for (var, bc) in zip(vars, coeffs_bases)]...))[:]
-	indices = eval(Expr(:comprehension, Expr(:tuple, vars...), [Expr(:(=), var, bc) for (var, bc) in zip(vars, indices_bases)]...))[:]
+    coeffs = eval(Expr(:comprehension, :(Expr(:call, :*, $(vars...))), [Expr(:(=), var, bc) for (var, bc) in zip(vars, coeffs_bases)]...))[:]
+    indices = eval(Expr(:comprehension, Expr(:tuple, vars...), [Expr(:(=), var, bc) for (var, bc) in zip(vars, indices_bases)]...))[:]
 
 	return setup, coeffs, indices
 end
