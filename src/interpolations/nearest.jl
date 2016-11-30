@@ -1,13 +1,11 @@
 export NearestInterpolation
 
 abstract NearestInterpolation <: AbstractInterpolation{1}
-NearestInterpolation() = NearestInterpolation
 
-function generate_base_interpolation(interp::Type{NearestInterpolation}, x::Symbol)
-	setup = :()
-	coeffs = (:(1))
-	indices = (:(round($x)))
+function generate_interpolation(interp::Type{NearestInterpolation}, var::Symbol)
+	setups = Expr(:block)
+	coeffs = (:(1),)
+	indices = (:(round(Int, $var)),)
 
-	return setup, coeffs, indices
+	return setups, coeffs, indices
 end
-generate_base_interpolation(interp::Type{NearestInterpolation}, x::Tuple{Symbol}) = generate_base_interpolation(interp, x[1])

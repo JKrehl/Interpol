@@ -1,27 +1,21 @@
-export append
+export combine_coeffs, combine_indices
 
-import Base.checkbounds
-
-append{T}(ex::Expr, app::T) = Expr(ex.head, ex.args..., app...)
-append{T<:Union{Expr, Symbol}}(ex::Expr, app::T) = Expr(ex.head, ex.args..., app)
-
-function appendtorefs(ex::Expr, sym::Union{Symbol, Expr}, tex::Union{Symbol, Expr})
-	if ex.head == :ref && ex.args[1]==sym
-		push!(ex.args, tex)
+function combine_coeffs(coeffs)
+	if length(coeffs)==1
+		return coeffs
+	elseif length(coeffs)==2
+		return [:($x * $y) for x in coeffs[1] for y in coeffs[2]]
 	else
-		for e in ex.args
-			if typeof(e)<:Expr
-				appendtorefs(e, sym, tex)
-			end
-		end
+		return combine_coeffs([coeffs[1], combine_coeffs(coeffs[2:end])])
 	end
-	return ex
 end
 
-@generated function checkbounds{T, N}(::Type{Bool}, arr::AbstractArray{T, N}, x::Integer...)
-	quote
-		$(Expr(:meta, :inline))
-		$(Expr(:block, [:($(symbol("x_", i)) = x[$i]) for i in 1:N]...))
-		return !$(reduce((i,j) -> Expr(:||, i, j), vcat([[:(1 > x[$i]), :(x[$i] > size(arr, $i))] for i in 1:N]...)))
+function combine_indices(indices)
+	if length(indices)==1
+		return indices
+	elseif length(indices)==2
+		return [(x..., y...) for x in indices[1] for y in indices[2]]
+	else
+		return combine_indices([indices[1], combine_indices(indices[2:end])])
 	end
 end

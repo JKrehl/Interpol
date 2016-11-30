@@ -1,16 +1,14 @@
 export LinearInterpolation
 
 abstract LinearInterpolation <: AbstractInterpolation{1}
-LinearInterpolation() = LinearInterpolation
-ndims(::Type{
 
-function generate_base_interpolation(interp::Type{LinearInterpolation}, x::Symbol)
-	ix = Symbol("i_", x)
+function generate_interpolation(interp::Type{LinearInterpolation}, var::Symbol)
+	ivar = Symbol("i_", var)
+	rvar = Symbol("r_", var)
+	
+	setups = Expr(:block, :($ivar = floor(Int64, $var)), :($rvar = $var-$ivar))
+	coeffs = (:(1-$rvar), :($rvar))
+	indices = (ivar, :($ivar+1))
 
-	setup = :($ix = floor(Int64, $x))
-	coeffs = (:($ix+1-$x), :($x-$ix))
-	indices = (ix, :($ix+1))
-
-	return setup, coeffs, indices
+	return setups, coeffs, indices
 end
-generate_base_interpolation(interp::Type{LinearInterpolation}, x::Tuple{Symbol}) = generate_base_interpolation(interp, x[1])
