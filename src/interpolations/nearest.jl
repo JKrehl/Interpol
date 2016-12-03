@@ -1,11 +1,9 @@
+import Base.getindex
+
 export NearestInterpolation
 
 abstract NearestInterpolation <: AbstractInterpolation{1}
 
-function generate_interpolation(interp::Type{NearestInterpolation}, var::Symbol)
-	setups = Expr(:block)
-	coeffs = (:(1),)
-	indices = (:(round(Int, $var)),)
-
-	return setups, coeffs, indices
+function getindex{T<:Real}(interp::Type{NearestInterpolation}, x::T)
+	return InterpolationSupport{1,T,Int}[(one(T), (round(Int, x),))]
 end

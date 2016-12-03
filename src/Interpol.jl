@@ -1,7 +1,5 @@
 module Interpol
 
-	include("utilities.jl")
-
 	include("Interpolation.jl")
 
 	include("interpolations/linear.jl")

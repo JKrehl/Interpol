@@ -1,66 +1,140 @@
+import Base.ndims, Base.*, Base.==, Base.convert, Base.getindex
+
 export
 	AbstractInterpolation,
-	InterpolationContainer
+	CompoundInterpolation,
+	InterpolationSupport,
+	inplaceadd
 
-import Base: ndims, getindex
 
 abstract AbstractInterpolation{N}
 AbstractInterpolation(N=1) = AbstractInterpolation{N}
-
 ndims{N}(::Type{AbstractInterpolation{N}}) = N
 ndims{I<:AbstractInterpolation}(::Type{I}) = ndims(I.super)
 
-abstract InterpolationContainer{N, INS<:Tuple{Vararg{AbstractInterpolation}}} <: AbstractInterpolation{N}
-InterpolationContainer{INS<:Tuple{Vararg{AbstractInterpolation}}}(::Type{INS}) = InterpolationContainer{sum(map(ndims, INS.parameters)), INS}
+abstract CompoundInterpolation{N, INS<:Tuple{Vararg{AbstractInterpolation}}} <: AbstractInterpolation{N}
+CompoundInterpolation{INS<:Tuple{Vararg{AbstractInterpolation}}}(::Type{INS}) = CompoundInterpolation{sum(map(ndims, INS.parameters)), INS}
+CompoundInterpolation(ins...) = CompoundInterpolation(Tuple{ins...})
+ndims{INC<:CompoundInterpolation}(::Type{INC}) = INC.parameters[1]
 
-InterpolationContainer(ins...) = InterpolationContainer(Tuple{ins...})
-ndims{INC<:InterpolationContainer}(::Type{INC}) = INC.parameters[1]
-
-generate_interpolation{I<:AbstractInterpolation{1}}(interp::Type{I}, x::Tuple{Symbol}) = begin bs,bc,bi = generate_interpolation(interp, x[1]); return bs, bc, [(ibi,) for ibi in bi]; end
-
-function generate_interpolation{N, INS}(interps::Type{InterpolationContainer{N, INS}}, vars::NTuple{N, Symbol})
-	NS = map(ndims, INS.parameters)
-	assert(N == sum(NS))
-	base_setups = Expr[]
-	base_coeffs = Tuple[]
-	base_indices = Array[]
-	
-	dvars = tuple([(vars[be:be+n-1]...) for (be, n) in zip(cumsum(NS), NS)]...)
-	
-	for (ivar, interp) in zip(dvars, INS.parameters)
-		bs, bc, bi = generate_interpolation(interp, ivar)
-		push!(base_setups, bs)
-		push!(base_coeffs, bc)
-		push!(base_indices, bi)
-	end
-	
-	setup = Expr(:block, base_setups...)
-	coeffs = combine_coeffs(base_coeffs)
-	indices = combine_indices(base_indices)
-	
-	return setup, coeffs, indices
+immutable InterpolationSupport{N, CT, IT}
+	coeff::CT
+	indices::NTuple{N, IT}
 end
 
-@generated function getindex{AI<:AbstractInterpolation}(interp::Type{AI}, x::Real...)
-	N = ndims(AI)
-	@assert N == length(x)
-	vars = ([Symbol("x_", i) for i in 1:N]...)
-	setup, coeffs, indices = generate_interpolation(AI, vars)
+InterpolationSupport(coeff, indices) = InterpolationSupport(coeff, promote(indices...))
+convert{N, CT, IT}(::Type{InterpolationSupport}, t::Tuple{CT, NTuple{N, IT}}) = InterpolationSupport{N, CT, IT}(t[1], t[2])
+convert{N, CT, IT}(::Type{InterpolationSupport{N, CT, IT}}, t::Tuple{CT, NTuple{N, IT}}) = InterpolationSupport{N, CT, IT}(t[1], t[2])
+
+import Base.getindex
+getindex{N, CT, IT}(::Type{InterpolationSupport}, x::Vararg{Tuple{CT, Vararg{IT, N}}}) = map(InterpolationSupport, [x...])
+ndims{N}(::InterpolationSupport{N}) = N
+
+*(a::InterpolationSupport, b::InterpolationSupport) = InterpolationSupport(a.coeff*b.coeff, (a.indices..., b.indices...))
+*(a, b::InterpolationSupport) = InterpolationSupport(a*b.coeff, b.indices)
+*(a::InterpolationSupport, b) = b*a
+==(a::InterpolationSupport, b::InterpolationSupport) = a.coeff==b.coeff && a.indices==b.indices
+
+using Base.Cartesian
+@generated function getindex{N, INS}(interps::Type{CompoundInterpolation{N, INS}}, x::Vararg{TypeVar(:T), N})
+	bsym = [Symbol("b_", i) for i in 1:N]
+	ibsym = [Symbol("ib_", i) for i in 1:N]
+	
+	bsymdefs = Expr(:block, [Expr(:(=), bsym[i], :(getindex($(INS.parameters[i]), x[$i]))) for i in 1:N]...)
+	
+	flesh = :($(Expr(:call, :*, ibsym...)))	
+	flesh = Expr(:generator, flesh, [Expr(:(=), ibsym[i], bsym[i]) for i in 1:N]...)
 	
 	quote
-		$(Expr(:meta, :inline))
-		$(Expr(:block, [Expr(:(=), Symbol("x_", i), Expr(:ref, :x, i)) for i in 1:N]...))
-		$(setup)
-
-		return $(Expr(:vect, coeffs...)), $(Expr(:vect, [Expr(:vect, indi...) for indi in indices]...))
+		$bsymdefs
+		return vec($(Expr(:comprehension, flesh)))
 	end
 end
 
-@generated function getindex{AA<:AbstractArray ,AI<:AbstractInterpolation}(array::AA, interp::Type{AI}, x::Real...)
-	@assert ndims(AI) == length(x)
+Base.@propagate_inbounds @generated function getindex{AT, N, INS}(aa::AbstractArray{AT,N}, interps::Type{CompoundInterpolation{N, INS}}, x::Vararg{TypeVar(:T), N})
+	bsym = [Symbol("b_", i) for i in 1:N]
+	ibsym = [Symbol("ib_", i) for i in 1:N]
+	cbsym = [Symbol("cb_", i) for i in 1:N]
+	
+	bsymdefs = Expr(:block, [Expr(:(=), bsym[i], :(getindex($(INS.parameters[i]), x[$i]))) for i in 1:N]...)
+	
+	flesh = :(re += $(cbsym[1]).coeff * aa[$(cbsym[1]).indices...])
+	for i in 1:N
+		flesh = :(for $(ibsym[i]) in $(bsym[i])
+			$(i!=N ? :($(cbsym[i]) =  $(ibsym[i])*$(cbsym[i+1])) : :($(cbsym[i]) = $(ibsym[i])))
+			$flesh
+		end)
+	end
+	
 	quote
-		$(Expr(:meta, :inline))
-		coeffs, indices = getindex(interp, x...)
-		return sum(c*array[i...] for c in coeffs, i in indices)
+		re = zero($(promote_type(AT, x...)))
+		$bsymdefs
+		$flesh
+		return re
+	end
+end
+
+Base.@propagate_inbounds @generated function getindex{AT, N, IN<:AbstractInterpolation{1}}(aa::AbstractArray{AT,N}, interps::Type{IN}, x::Vararg{TypeVar(:T), N})
+	bsym = [Symbol("b_", i) for i in 1:N]
+	ibsym = [Symbol("ib_", i) for i in 1:N]
+	cbsym = [Symbol("cb_", i) for i in 1:N]
+	
+	bsymdefs = Expr(:block, [Expr(:(=), bsym[i], :(getindex($(IN), x[$i]))) for i in 1:N]...)
+	
+	flesh = :(re += $(cbsym[1]).coeff * aa[$(cbsym[1]).indices...])
+	for i in 1:N
+		flesh = :(for $(ibsym[i]) in $(bsym[i])
+			$(i!=N ? :($(cbsym[i]) =  $(ibsym[i])*$(cbsym[i+1])) : :($(cbsym[i]) = $(ibsym[i])))
+			$flesh
+		end)
+	end
+	
+	quote
+		re = zero($(promote_type(AT, x...)))
+		$bsymdefs
+		$flesh
+		return re
+	end
+end
+
+Base.@propagate_inbounds @generated function inplaceadd{AT, N, INS, VT}(aa::AbstractArray{AT,N}, interps::Type{CompoundInterpolation{N, INS}},  v::VT, x::Vararg{TypeVar(:T), N})
+	bsym = [Symbol("b_", i) for i in 1:N]
+	ibsym = [Symbol("ib_", i) for i in 1:N]
+	cbsym = [Symbol("cb_", i) for i in 1:N]
+	
+	bsymdefs = Expr(:block, [Expr(:(=), bsym[i], :(getindex($(INS.parameters[i]), x[$i]))) for i in 1:N]...)
+	
+	flesh = :(aa[$(cbsym[1]).indices...] += $(cbsym[1]).coeff * v)
+	for i in 1:N
+		flesh = :(for $(ibsym[i]) in $(bsym[i])
+			$(i!=N ? :($(cbsym[i]) =  $(ibsym[i])*$(cbsym[i+1])) : :($(cbsym[i]) = $(ibsym[i])))
+			$flesh
+		end)
+	end
+	
+	quote
+		$bsymdefs
+		$flesh
+	end
+end
+
+Base.@propagate_inbounds @generated function inplaceadd{AT, N, IN<:AbstractInterpolation{1}, VT}(aa::AbstractArray{AT,N}, interp::Type{IN},  v::VT, x::Vararg{TypeVar(:T), N})
+	bsym = [Symbol("b_", i) for i in 1:N]
+	ibsym = [Symbol("ib_", i) for i in 1:N]
+	cbsym = [Symbol("cb_", i) for i in 1:N]
+	
+	bsymdefs = Expr(:block, [Expr(:(=), bsym[i], :(getindex($(IN), x[$i]))) for i in 1:N]...)
+	
+	flesh = :(aa[$(cbsym[1]).indices...] += $(cbsym[1]).coeff * v)
+	for i in 1:N
+		flesh = :(for $(ibsym[i]) in $(bsym[i])
+			$(i!=N ? :($(cbsym[i]) =  $(ibsym[i])*$(cbsym[i+1])) : :($(cbsym[i]) = $(ibsym[i])))
+			$flesh
+		end)
+	end
+	
+	quote
+		$bsymdefs
+		$flesh
 	end
 end
