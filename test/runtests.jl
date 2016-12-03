@@ -2,4 +2,6 @@ using Interpol
 using Base.Test
 
 # write your own tests here
-include("abstract_base_types.jl")
+include("base_types.jl")
+include("interpolation_bases.jl")
+include("interpolation.jl")
