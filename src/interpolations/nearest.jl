@@ -1,9 +1,16 @@
 import Base.getindex
 
-export NearestInterpolation
+export NearestInterpolation,
+	getindex,
+	getindex_symbolic
 
 abstract NearestInterpolation <: AbstractInterpolation{1}
 
-function getindex{T<:Real}(interp::Type{NearestInterpolation}, x::T)
-	return InterpolationSupport{1,T,Int}[(one(T), (round(Int, x),))]
+@inline function getindex{T<:Real}(interp::Type{NearestInterpolation}, x::T)
+	return ((one(T), round(Int, x)),)
+end
+
+function getindex_symbolic(interp::Type{NearestInterpolation}, x::Union{Symbol, Expr})
+	@gensym a b
+	return :(), ((:(1), :(round(Int, $x))),)
 end
