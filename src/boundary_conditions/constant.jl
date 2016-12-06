@@ -1,20 +1,30 @@
 export ConstantBoundary
 
-type ConstantBoundary{V} <: AbstractBoundaryCondition
-end
-ConstantBoundary(V) = ConstantBoundary{V}()
-ConstantBoundary() = ConstantBoundary{0.}()
+abstract ConstantBoundary{V} <: AbstractBoundary
+ConstantBoundary(V) = ConstantBoundary{V}
 
-function generate_boundarycondition{T, N, A, V}(bcarr::Type{BCArray{T, N, A, ConstantBoundary{V}}})
+import Base.getindex
+
+@generated function getindex{AT, N, CB<:ConstantBoundary, IT}(arr::AbstractArray{AT, N}, bc::Type{CB}, x::Vararg{IT, N})
+	if typeof(CB.parameters[1])==TypeVar
+		v = zero(AT)
+	else
+		v = AT(CB.parameters[1])
+	end
+
 	quote
-		arr = bcarr.arr
-		$(Expr(:block, [:($(symbol("x_", i)) = x[$i]) for i in 1:N]...))
+		$(Expr(:meta, :inline))
 
-		if !$(reduce((i,j) -> Expr(:||, i, j), vcat([[:(1 > $(symbol("x_", i))), :($(symbol("x_", i)) > size(arr, $i))] for i in 1:N]...)))
-			#return getindex(arr, x...)
-			res = $(Expr(:call, :getindex, :arr, [symbol("x_", i) for i in 1:N]...))
-		else
-			res = $(T(V))
-		end
+		@boundscheck if !checkbounds(Bool, arr, x...); return $v; end
+		@inbounds return arr[x...]
+	end
+end
+
+@generated function inplaceadd!{AT, N, CB<:ConstantBoundary, VT, IT}(arr::AbstractArray{AT, N}, bc::Type{CB}, v::VT, x::Vararg{IT, N})
+	quote
+		$(Expr(:meta, :inline))
+
+		@boundscheck if !checkbounds(Bool, arr, x...); return end
+		@inbounds inplaceadd!(arr, v, x...)
 	end
 end

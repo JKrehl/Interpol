@@ -3,8 +3,7 @@ import Base.ndims, Base.*, Base.==, Base.convert, Base.getindex
 export
 	AbstractInterpolation,
 	CompoundInterpolation,
-	InterpolationSupport,
-	inplaceadd
+	InterpolationSupport
 
 
 abstract AbstractInterpolation{N}
@@ -33,7 +32,7 @@ using Base.Cartesian
 	end
 end
 
-@generated function getindex{AT, N, INS}(arr::AbstractArray{AT,N}, interps::Type{CompoundInterpolation{N, INS}}, x::Vararg{TypeVar(:T), N})
+@generated function getindex{AT, N, INS, IT}(arr::AbstractArray{AT,N}, interps::Type{CompoundInterpolation{N, INS}}, x::Vararg{IT, N})
 	symbolic = [getindex_symbolic(INS.parameters[i], :(x[$i])) for i in 1:N]
 
 	ibsym = [[Symbol("ib_", i, "_", j) for j in 1:length(symbolic[i][2])] for i in 1:N]
@@ -60,9 +59,9 @@ end
 	end
 end
 
-@Base.propagate_inbounds getindex{N, AT, IT, IN<:AbstractInterpolation{1}}(arr::AbstractArray{AT, N}, interp::Type{IN}, x::Vararg{IT, N}) = getindex(arr, CompoundInterpolation{N, NTuple{N, IN}}, x...)
+@inline getindex{N, AT, IT, IN<:AbstractInterpolation{1}}(arr::AbstractArray{AT, N}, interp::Type{IN}, x::Vararg{IT, N}) = getindex(arr, CompoundInterpolation{N, NTuple{N, IN}}, x...)
 
-Base.@propagate_inbounds @generated function inplaceadd{AT, N, INS, VT}(arr::AbstractArray{AT,N}, interps::Type{CompoundInterpolation{N, INS}},  v::VT, x::Vararg{TypeVar(:T), N})
+Base.@propagate_inbounds @generated function inplaceadd!{AT, N, INS, VT, IT}(arr::AbstractArray{AT,N}, interps::Type{CompoundInterpolation{N, INS}},  v::VT, x::Vararg{IT, N})
 	symbolic = [getindex_symbolic(INS.parameters[i], :(x[$i])) for i in 1:N]
 
 	ibsym = [[Symbol("ib_", i, "_", j) for j in 1:length(symbolic[i][2])] for i in 1:N]
@@ -78,14 +77,14 @@ Base.@propagate_inbounds @generated function inplaceadd{AT, N, INS, VT}(arr::Abs
 		indices_prod = Base.Prod(ibsym[i], indices_prod)
 	end
 
-	flesh = Expr(:block, map((c,i) -> Expr(:+=, Expr(:ref, :arr, i...), Expr(:call, :*, c..., :v)), coeff_prod, indices_prod)...)
+	flesh = Expr(:block, map((c,i) -> Expr(:call, :inplaceadd!, :arr, Expr(:call, :*, c..., :v), i...), coeff_prod, indices_prod)...)
 
 	quote
 		$(Expr(:meta, :inline))
 		$setups
 		$bsymdefs
-		$flesh
+		$flesh;
 	end
 end
 
-@Base.propagate_inbounds inplaceadd{AT, N, IN<:AbstractInterpolation{1}, VT}(arr::AbstractArray{AT,N}, interps::Type{IN},  v::VT, x::Vararg{TypeVar(:T), N})  = inplaceadd(arr, CompoundInterpolation{N, NTuple{N, IN}}, v, x...)
+@inline inplaceadd!{AT, N, IN<:AbstractInterpolation{1}, VT}(arr::AbstractArray{AT,N}, interps::Type{IN},  v::VT, x::Vararg{TypeVar(:T), N})  = inplaceadd!(arr, CompoundInterpolation{N, NTuple{N, IN}}, v, x...)
