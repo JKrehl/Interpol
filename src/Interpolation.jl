@@ -41,7 +41,7 @@ end
 	setups = Expr(:block, [symbolic[i][1] for i in 1:N]...)
 	bsymdefs = Expr(:block, [Expr(:block, [Expr(:block, Expr(:(=), cbsym[i][j], symbolic[i][2][j][1]), Expr(:(=), ibsym[i][j], symbolic[i][2][j][2])) for j in 1:length(symbolic[i][2])]...) for i in 1:N]...)
 
-	indices_prod = Base.product(ibsym)
+	indices_prod = Base.product(ibsym...)
 	indices = map(a -> Expr(:ref, :arr, a...), indices_prod)
 
 	for i in 1:N
@@ -68,8 +68,8 @@ Base.@propagate_inbounds @generated function inplaceadd!{AT, N, INS, VT, IT}(arr
 	bsymdefs = Expr(:block, [Expr(:block, [Expr(:block, Expr(:(=), cbsym[i][j], symbolic[i][2][j][1]), Expr(:(=), ibsym[i][j], symbolic[i][2][j][2])) for j in 1:length(symbolic[i][2])]...) for i in 1:N]...)
 
 
-	coeff_prod = Base.product(cbsym)
-	indices_prod = Base.product(ibsym)
+	coeff_prod = Base.product(cbsym...)
+	indices_prod = Base.product(ibsym...)
 
 	flesh = Expr(:block, map((c,i) -> Expr(:call, :inplaceadd!, :arr, Expr(:call, :*, c..., :v), i...), coeff_prod, indices_prod)...)
 
