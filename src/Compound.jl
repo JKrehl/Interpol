@@ -1,5 +1,5 @@
 import Base.getindex
 
-@inline getindex{A<:AbstractArray, BC<:AbstractBoundary, IN<:Interpol.AbstractInterpolation}(arr::A, bound::Type{BC}, interp::Type{IN}, x::Real...) = BoundedArray(arr, BC)[IN, x...]
+@inline getindex{A<:AbstractArray, IM1<:AbstractIndexManipulator, IM2<:AbstractIndexManipulator}(arr::A, ::Type{IM1}, ::Type{IM2}, x::Number...) = getindex(arr, Tuple{IM1}, IM2, x...)
 
-@inline inplaceadd!{A<:AbstractArray, BC<:AbstractBoundary, IN<:Interpol.AbstractInterpolation}(arr::A, bound::Type{BC}, interp::Type{IN}, v, x::Real...) = inplaceadd!(BoundedArray(arr, BC), IN, v, x...)
+@inline inplaceadd!{A<:AbstractArray, IM1<:AbstractIndexManipulator, IM2<:AbstractIndexManipulator}(arr::A, ::Type{IM1}, ::Type{IM2}, v::Number, x::Number...) = inplaceadd!(arr, Tuple{IM1}, IM2, v, x...)

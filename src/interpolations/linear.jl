@@ -4,7 +4,7 @@ export LinearInterpolation,
 	getindex,
 	getindex_symbolic
 
-abstract LinearInterpolation <: AbstractInterpolation{1}
+abstract LinearInterpolation <: SimpleInterpolation
 
 @inline function getindex{T<:Real}(interp::Type{LinearInterpolation}, x::T)
 	ix = floor(Int, x)

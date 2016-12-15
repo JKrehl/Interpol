@@ -3,7 +3,7 @@ import Base.size, Base.ndims, Base.getindex
 export AbstractBoundary,
   BoundedArray
 
-abstract AbstractBoundary
+abstract AbstractBoundary <: AbstractIndexManipulator
 
 immutable BoundedArray{T, N, A<:AbstractArray, B<:AbstractBoundary} <: AbstractArray{T,N}
 	arr::A

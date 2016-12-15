@@ -4,7 +4,7 @@ export NearestInterpolation,
 	getindex,
 	getindex_symbolic
 
-abstract NearestInterpolation <: AbstractInterpolation{1}
+abstract NearestInterpolation <: SimpleInterpolation
 
 @inline function getindex{T<:Real}(interp::Type{NearestInterpolation}, x::T)
 	return ((one(T), round(Int, x)),)

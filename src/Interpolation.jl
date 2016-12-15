@@ -2,14 +2,18 @@ import Base.ndims, Base.*, Base.==, Base.convert, Base.getindex
 
 export
 	AbstractInterpolation,
+	SimpleInterpolation,
 	CompoundInterpolation,
 	InterpolationSupport
 
+abstract AbstractIndexManipulator
 
-abstract AbstractInterpolation{N}
+abstract AbstractInterpolation{N} <: AbstractIndexManipulator
 AbstractInterpolation(N=1) = AbstractInterpolation{N}
 ndims{N}(::Type{AbstractInterpolation{N}}) = N
 ndims{I<:AbstractInterpolation}(::Type{I}) = ndims(I.super)
+
+abstract SimpleInterpolation <: AbstractInterpolation{1}
 
 abstract CompoundInterpolation{N, INS<:Tuple{Vararg{AbstractInterpolation}}} <: AbstractInterpolation{N}
 CompoundInterpolation{INS<:Tuple{Vararg{AbstractInterpolation}}}(::Type{INS}) = CompoundInterpolation{sum(map(ndims, INS.parameters)), INS}
@@ -32,7 +36,7 @@ using Base.Cartesian
 	end
 end
 
-@generated function getindex{AT, N, INS, IT}(arr::AbstractArray{AT,N}, interps::Type{CompoundInterpolation{N, INS}}, x::Vararg{IT, N})
+@generated function getindex{AT, N, INS, IT<:Number, IM<:Tuple}(arr::AbstractArray{AT,N}, ::Type{IM}, ::Type{CompoundInterpolation{N, INS}}, x::Vararg{IT, N})
 	symbolic = [getindex_symbolic(INS.parameters[i], :(x[$i])) for i in 1:N]
 
 	ibsym = [[Symbol("ib_", i, "_", j) for j in 1:length(symbolic[i][2])] for i in 1:N]
