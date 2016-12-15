@@ -42,7 +42,7 @@ end
 	bsymdefs = Expr(:block, [Expr(:block, [Expr(:block, Expr(:(=), cbsym[i][j], symbolic[i][2][j][1]), Expr(:(=), ibsym[i][j], symbolic[i][2][j][2])) for j in 1:length(symbolic[i][2])]...) for i in 1:N]...)
 
 	indices_prod = Base.product(ibsym...)
-	indices = map(a -> Expr(:ref, :arr, a...), indices_prod)
+	indices = map(a -> Expr(:ref, :arr, IM.parameters..., a...), indices_prod)
 
 	for i in 1:N
 		indices = mapslices(a->Expr(:call, :+, [Expr(:call, :*, ic, ia) for (ic,ia) in zip(cbsym[i], a)]...), indices, i)
@@ -56,9 +56,10 @@ end
 	end
 end
 
-@inline getindex{N, AT, IT, IN<:AbstractInterpolation{1}}(arr::AbstractArray{AT, N}, interp::Type{IN}, x::Vararg{IT, N}) = getindex(arr, CompoundInterpolation{N, NTuple{N, IN}}, x...)
+@inline getindex{AT, N, IT<:Number, IN<:SimpleInterpolation, IM<:Tuple}(arr::AbstractArray{AT, N}, ::Type{IM}, ::Type{IN}, x::Vararg{IT, N}) = getindex(arr, IM, CompoundInterpolation{N, NTuple{N, IN}}, x...)
+@inline getindex{AT, N, IT<:Number, IN<:AbstractInterpolation}(arr::AbstractArray{AT,N}, ::Type{IN}, x::Vararg{IT, N}) = getindex(arr, Tuple{}, IN, x...)
 
-Base.@propagate_inbounds @generated function inplaceadd!{AT, N, INS, VT, IT}(arr::AbstractArray{AT,N}, interps::Type{CompoundInterpolation{N, INS}},  v::VT, x::Vararg{IT, N})
+@generated function inplaceadd!{AT, N, INS, VT, IT<:Number, IM<:Tuple}(arr::AbstractArray{AT,N}, ::Type{IM}, ::Type{CompoundInterpolation{N, INS}},  v::VT, x::Vararg{IT, N})
 	symbolic = [getindex_symbolic(INS.parameters[i], :(x[$i])) for i in 1:N]
 
 	ibsym = [[Symbol("ib_", i, "_", j) for j in 1:length(symbolic[i][2])] for i in 1:N]
@@ -71,14 +72,16 @@ Base.@propagate_inbounds @generated function inplaceadd!{AT, N, INS, VT, IT}(arr
 	coeff_prod = Base.product(cbsym...)
 	indices_prod = Base.product(ibsym...)
 
-	flesh = Expr(:block, map((c,i) -> Expr(:call, :inplaceadd!, :arr, Expr(:call, :*, c..., :v), i...), coeff_prod, indices_prod)...)
+	flesh = Expr(:block, map((c,i) -> Expr(:call, :inplaceadd!, :arr, IM.parameters..., Expr(:call, :*, c..., :v), i...), coeff_prod, indices_prod)...)
 
 	quote
 		$(Expr(:meta, :inline))
 		$setups
 		$bsymdefs
-		$flesh;
+		$flesh
+		return
 	end
 end
 
-@inline inplaceadd!{AT, N, IN<:AbstractInterpolation{1}, VT}(arr::AbstractArray{AT,N}, interps::Type{IN},  v::VT, x::Vararg{TypeVar(:T), N})  = inplaceadd!(arr, CompoundInterpolation{N, NTuple{N, IN}}, v, x...)
+@inline inplaceadd!{AT, N, IN<:SimpleInterpolation, VT, IM<:Tuple}(arr::AbstractArray{AT,N}, ::Type{IM}, ::Type{IN},  v::VT, x::Vararg{TypeVar(:T), N})  = inplaceadd!(arr, IM, CompoundInterpolation{N, NTuple{N, IN}}, v, x...)
+@inline inplaceadd!{AT, N, IN<:AbstractInterpolation, VT}(arr::AbstractArray{AT,N}, ::Type{IN},  v::VT, x::Vararg{TypeVar(:T), N})  = inplaceadd!(arr, Tuple{}, IN, v, x...)
