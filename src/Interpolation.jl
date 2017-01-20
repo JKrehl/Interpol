@@ -21,7 +21,7 @@ CompoundInterpolation(ins...) = CompoundInterpolation(Tuple{ins...})
 ndims{INC<:CompoundInterpolation}(::Type{INC}) = INC.parameters[1]
 
 using Base.Cartesian
-@generated function getindex{N, INS}(interps::Type{CompoundInterpolation{N, INS}}, x::Vararg{TypeVar(:T), N})
+@inline @generated function getindex{N, INS}(interps::Type{CompoundInterpolation{N, INS}}, x::Vararg{TypeVar(:T), N})
 	bsym = [Symbol("b_", i) for i in 1:N]
 	ibsym = [Symbol("ib_", i) for i in 1:N]
 
@@ -36,7 +36,7 @@ using Base.Cartesian
 	end
 end
 
-@generated function getindex{AT, N, INS, IT<:Number, IM<:Tuple}(arr::AbstractArray{AT,N}, ::Type{IM}, ::Type{CompoundInterpolation{N, INS}}, x::Vararg{IT, N})
+@inline @generated function getindex{AT, N, INS, IT<:Number, IM<:Tuple}(arr::AbstractArray{AT,N}, ::Type{IM}, ::Type{CompoundInterpolation{N, INS}}, x::Vararg{IT, N})
 	symbolic = [getindex_symbolic(INS.parameters[i], :(x[$i])) for i in 1:N]
 
 	ibsym = [[Symbol("ib_", i, "_", j) for j in 1:length(symbolic[i][2])] for i in 1:N]
@@ -63,7 +63,7 @@ end
 @inline getindex{AT, N, IT<:Number, IN<:SimpleInterpolation, IM<:Tuple}(arr::AbstractArray{AT, N}, ::Type{IM}, ::Type{IN}, x::Vararg{IT, N}) = getindex(arr, IM, CompoundInterpolation{N, NTuple{N, IN}}, x...)
 @inline getindex{AT, N, IT<:Number, IN<:AbstractInterpolation}(arr::AbstractArray{AT,N}, ::Type{IN}, x::Vararg{IT, N}) = getindex(arr, Tuple{}, IN, x...)
 
-@generated function inplaceadd!{AT, N, INS, VT, IT<:Number, IM<:Tuple}(arr::AbstractArray{AT,N}, ::Type{IM}, ::Type{CompoundInterpolation{N, INS}},  v::VT, x::Vararg{IT, N})
+@inline @generated function inplaceadd!{AT, N, INS, VT, IT<:Number, IM<:Tuple}(arr::AbstractArray{AT,N}, ::Type{IM}, ::Type{CompoundInterpolation{N, INS}},  v::VT, x::Vararg{IT, N})
 	symbolic = [getindex_symbolic(INS.parameters[i], :(x[$i])) for i in 1:N]
 
 	ibsym = [[Symbol("ib_", i, "_", j) for j in 1:length(symbolic[i][2])] for i in 1:N]
