@@ -27,7 +27,7 @@ using Base.Cartesian
 
 	bsymdefs = Expr(:block, [Expr(:(=), bsym[i], :(getindex($(INS.parameters[i]), x[$i]))) for i in 1:N]...)
 
-	flesh = Expr(:tuple, Expr(:call, :*, [:($i[0]) for i in ibsym]...), [:($i[1]) for i in ibsym]...)
+	flesh = Expr(:tuple, Expr(:call, :*, [:($i[1]) for i in ibsym]...), [:($i[2]) for i in ibsym]...)
 	flesh = Expr(:generator, flesh, [Expr(:(=), ibsym[i], bsym[i]) for i in 1:N]...)
 
 	quote
